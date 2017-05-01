@@ -107,12 +107,16 @@ def build_indice_matrix(_datas, _wordToIndice):
 
     print(len(dataMatrix))
     print(len(dataMatrix[0]))
+    print(_datas[0])
+    print(dataMatrix[0])
+    return dataMatrix
+
 
 def build_train_matrix():
     documents, querys, answers, candidates = build_data_matrix('data/cbtest_NE_train.txt')
     wordToIndice = build_word_to_indice_map(documents)
-    build_indice_matrix(candidates, wordToIndice)
-
+    datas = build_indice_matrix(candidates, wordToIndice)
+    return datas
 
 def extract_one_sample(_f):
     data = ""
