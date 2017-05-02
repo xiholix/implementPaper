@@ -187,8 +187,55 @@ def prepare_one_batch(_batchSize):
     wordToIndice, maxLength = build_word_to_indice_map(documents)
     datas, sequenceLength = build_indice_matrix(candidates, wordToIndice, maxLength)
     d = np.array(datas)
+    print(d.shape)
+
+
+def batch_data(_batchSize):
+    pass
+
+
+def test_queue():
+
+    i = tf.train.range_input_producer(5, shuffle=True).dequeue()
+    init = tf.global_variables_initializer()
+    sess = tf.Session()
+    sess.run(init)
+    tf.train.start_queue_runners(sess=sess)
+    for t in xrange(11):
+        a = sess.run(i)
+        print(a)
+
+
+def data_producer(_rawData, _batchSize, ):
+    raw_data = tf.convert_to_tensor(_rawData, name="raw_data", dtype=tf.int32)
+    data_len = tf.shape(raw_data)[0]
+    limit = data_len // _batchSize
+    i = tf.train.range_input_producer(limit, shuffle=True).dequeue()
+
+    return raw_data[i*_batchSize:(i+1)*_batchSize, :]
+
+
+def test():
+    documents, querys, answers, candidates = build_data_matrix('data/cbtest_NE_train.txt')
+    wordToIndice, maxLength = build_word_to_indice_map(documents)
+    datas, sequenceLength = build_indice_matrix(documents, wordToIndice, maxLength)
+    d = np.array(datas)
+    print(d.shape)
+    data = data_producer(d, 5)
+
+    init = tf.global_variables_initializer()
+    sess = tf.Session()
+    sess.run(init)
+    tf.train.start_queue_runners(sess=sess)
+    for t in xrange(11):
+        a = sess.run(data)
+        print(a)
 
 if __name__ == "__main__":
     # explore_data()
     # build_train_matrix()
     pass
+    # prepare_one_batch(10)
+    # test_queue()
+    # data_producer(np.arange(10), 3)
+    test()
