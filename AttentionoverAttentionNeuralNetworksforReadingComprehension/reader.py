@@ -35,6 +35,9 @@
 from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
+import numpy as np
+import tensorflow as tf
+
 
 def explore_data():
     path = 'data/cbtest_NE_train.txt'
@@ -68,55 +71,93 @@ def build_data_matrix(_path):
 
 
 def build_word_to_indice_map(_documents):
+    '''
+    建立词到索引的map,第0号索引留给填充位，1号索引留给未在该map中出现的词
+    :param _documents:
+    :return:
+    '''
     wordToIndice = {}
-    i = 1
+    i = 2
+    maxLength = 0
+
     for d in _documents:
         words = d.split()
+        if len(words) > maxLength:
+            maxLength = len(words)
+
         for word in words:
             if not wordToIndice.has_key(word):
                 wordToIndice[word] = i
                 i += 1
     print( len(wordToIndice) )
     print( wordToIndice[wordToIndice.keys()[1]])
-    return wordToIndice
+    return wordToIndice, maxLength
 
 
-def build_indice_matrix(_datas, _wordToIndice):
+def build_indice_matrix(_datas, _wordToIndice, _maxLength):
+    '''
+    通过词的列表建立一个矩阵，并且每个句子都填充到_maxLength长,长于_maxLength的部分则截断
+    :param _datas:
+    :param _wordToIndice:
+    :param _maxLength:
+    :return:
+    '''
     sampleNums = len(_datas)
     sign = len(_datas[0])
     dataMatrix = []
+    sequenceLength = []
     if sign==1:
         for i in xrange(sampleNums):
+            length = len(_datas[i])
+            sequenceLength.append(length)
+            gap = _maxLength - length
+
             words = _datas[i].split()
             oneRow = []
             for word in words:
                 if(_wordToIndice.has_key(word) ):
                     oneRow.append(_wordToIndice[word])
                 else:
-                    oneRow.append(0)
+                    oneRow.append(1)
+
+            oneRow.extend([0]*gap)
+            oneRow = oneRow[:_maxLength]
             dataMatrix.append(oneRow)
     else:
         for i in xrange(sampleNums):
+            length = len(_datas[i])
+            sequenceLength.append(length)
+            gap = _maxLength - length
+
             oneRow = []
             for word in _datas[i]:
                 if (_wordToIndice.has_key(word)):
                     oneRow.append(_wordToIndice[word])
                 else:
                     oneRow.append(0)
+
+            oneRow.extend([0] * gap)
+            oneRow = oneRow[:_maxLength]
             dataMatrix.append(oneRow)
 
     print(len(dataMatrix))
     print(len(dataMatrix[0]))
     print(_datas[0])
     print(dataMatrix[0])
-    return dataMatrix
+    return dataMatrix, sequenceLength
 
 
 def build_train_matrix():
     documents, querys, answers, candidates = build_data_matrix('data/cbtest_NE_train.txt')
-    wordToIndice = build_word_to_indice_map(documents)
-    datas = build_indice_matrix(candidates, wordToIndice)
-    return datas
+    wordToIndice, maxLength = build_word_to_indice_map(documents)
+    datas, sequenceLength = build_indice_matrix(candidates, wordToIndice, maxLength)
+    d = np.array(datas)
+    print("result is ")
+    print(d.shape)
+    print(len(sequenceLength))
+    print(sequenceLength)
+    return datas, sequenceLength
+
 
 def extract_one_sample(_f):
     data = ""
@@ -141,9 +182,13 @@ def extract_one_sample(_f):
     return data, query, answer, candidates
 
 
-
-
+def prepare_one_batch(_batchSize):
+    documents, querys, answers, candidates = build_data_matrix('data/cbtest_NE_train.txt')
+    wordToIndice, maxLength = build_word_to_indice_map(documents)
+    datas, sequenceLength = build_indice_matrix(candidates, wordToIndice, maxLength)
+    d = np.array(datas)
 
 if __name__ == "__main__":
     # explore_data()
-    build_train_matrix()
+    # build_train_matrix()
+    pass
