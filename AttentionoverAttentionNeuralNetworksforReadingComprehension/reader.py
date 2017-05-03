@@ -52,6 +52,17 @@ def explore_data():
 
 
 def build_data_matrix(_path):
+    '''
+    返回由文档、查询、回答和候选答案的列表。因为原始数据的格式是：
+    1. 文档句子1
+    2. 文档句子2
+    ...
+    20. 文档句子20
+    21. query  answer  candidates
+    这种格式，本函数就是从这种函数中提取出需要的结构信息
+    :param _path:
+    :return:
+    '''
     documents, querys, answers, candidates  = ([] for _ in range(4))
     # 上面的代码不能用([],)*4来代替，若用([],)*4来代替则会这四个变量表示的是同一个[]对象
     with open(_path) as f:
@@ -64,8 +75,8 @@ def build_data_matrix(_path):
                 querys.append(sign[1])
                 answers.append(sign[2])
                 candidates.append(sign[3])
-    print(len(querys))
-    print(querys[0])
+    # print(len(querys))
+    # print(querys[0])
     # build_word_to_indice_map(documents)
     return documents, querys, answers, candidates
 
@@ -78,20 +89,27 @@ def build_word_to_indice_map(_documents):
     '''
     wordToIndice = {}
     i = 2
-    maxLength = 0
 
     for d in _documents:
         words = d.split()
-        if len(words) > maxLength:
-            maxLength = len(words)
-
         for word in words:
             if not wordToIndice.has_key(word):
                 wordToIndice[word] = i
                 i += 1
-    print( len(wordToIndice) )
-    print( wordToIndice[wordToIndice.keys()[1]])
-    return wordToIndice, maxLength
+
+    return wordToIndice
+
+def max_word_in_list(_datas):
+    maxLength = 0
+    for data in _datas:
+        if(len(data)>1):
+            length = len(data)
+        else:
+            length = len(data.split())
+        if length>maxLength:
+            maxLength = length
+
+    return maxLength
 
 
 def build_indice_matrix(_datas, _wordToIndice, _maxLength):
