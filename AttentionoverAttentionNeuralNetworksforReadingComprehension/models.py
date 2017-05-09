@@ -47,7 +47,7 @@ flags.DEFINE_float("dropRate", 0.1, "the drop rate")
 flags.DEFINE_integer('batchSize', 5, "the batch size")
 flags.DEFINE_integer("maxDocumentLength", 1319, "the largest number of word in document")
 flags.DEFINE_integer("maxQueryLength", 210, "the largest number of word in query")
-flags.DEFINE_integer("maxCandidate", 11, "the largest number of candidates")
+flags.DEFINE_integer("maxCandidate", 11, "the largest number of candidates ")
 FLAGS = flags.FLAGS
 
 
@@ -108,11 +108,46 @@ class AOAInputByIndice(object):
         self.indice = 0
         self.epochSize = 0
         self.indiceCounter = 0
-        maxDocumentLength = max_word_in_list(datas[0])
-        maxQueryLength = max_word_in_list(datas[1])
-        print(maxDocumentLength)
-        print(maxQueryLength)
-        print(max_word_in_list(datas[3]))
+        # documents, documentsLength = build_indice_matrix(datas[0], self.wordIndiceMap, FLAGS.maxDocumentLength)
+        # querys, queryLength = build_indice_matrix(datas[1], self.wordIndiceMap, FLAGS.maxQueryLength)
+        # candidates, candidatesLength = build_indice_matrix(datas[3], self.wordIndiceMap, FLAGS.maxCandidate)
+        #之前的最大长度正确是因为有build_indice_matrix得到的最大长度，而不是使用修改之前的max_word_in_list函数
+        #该函数之前由于使用if(len(data)>1)判断是否是列表的逻辑不正确，因为字符串的长度大于1
+        documents, documentsLength = build_indice_matrix(datas[0], self.wordIndiceMap, FLAGS.maxDocumentLength)
+        querys, queryLength = build_indice_matrix(datas[1], self.wordIndiceMap, FLAGS.maxQueryLength)
+        candidates, candidateLength = build_indice_matrix(datas[3], self.wordIndiceMap, FLAGS.maxCandidate)
+        answers, _ = build_indice_matrix(datas[2], self.wordIndiceMap, 1)
+        self.documents = documents
+        self.querys = querys
+        self.answers = answers
+        self.candidates = candidates
+        self.documentLength = documentsLength
+        self.queryLength = queryLength
+        self.candidateLength = candidateLength
+        print (len(documents))
+        print (documents[0])
+        print (documentsLength[0])
+        # print (len(querys[0]))
+        # print (candidates[0])
+        print (len(querys[0]))
+        print(querys[0])
+        print (candidates[0])
+        print (answers[0])
+        print( build_document_word_flag_list(documents[0], answers[0][0]))
+        # for j in xrange(len(documents)):
+        #     for i in xrange(11):
+        #         length = sum(build_document_word_flag_list(documents[j], candidates[j][i]))
+        #         if(length>1):
+        #             print('ye')
+        #             print(length)
+
+        matrix = build_document_candidate_matrix(documents, candidates)
+        matrix = np.array(matrix)
+        print(len(matrix))
+        print(len(matrix[0]))
+        print(len(matrix[0][0]))
+        print(matrix.shape)
+
 
 class AOAModel(object):
     #现在的sequenceLength还存在问题，因为document和query的肯定不同

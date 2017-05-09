@@ -65,13 +65,16 @@ def test_softmax():
     mask = tf.Variable(mask)
 
     expandDataSoftmax = softmax(expandData, 2, mask)
-    dataSoftmax = tf.nn.softmax(data, dim=-1)
-    # 此处的0,1都好使，使用-1可以表示最后一维，但无法使用2
+    dataSoftmax = tf.nn.softmax(data, dim=2)
+    # 此处的0,1都好使，使用-1可以表示最后一维，但无法使用2, 好像是这个版本的bug
+    # t = tf.reduce_mean(data, 2)
     init = tf.global_variables_initializer()
     sess = tf.Session()
     sess.run(init)
     d2 = sess.run(dataSoftmax)
     d  = sess.run(expandDataSoftmax)
+
+
     print(d)
     print(d2)
 

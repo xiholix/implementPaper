@@ -61,7 +61,7 @@ def build_data_matrix(_path):
     21. query  answer  candidates
     这种格式，本函数就是从这种函数中提取出需要的结构信息
     :param _path:
-    :return:
+    :return:document、query以及answer的都是用空格隔开的字符串表示，candidate是字符串的列表表示的
     '''
     documents, querys, answers, candidates  = ([] for _ in range(4))
     # 上面的代码不能用([],)*4来代替，若用([],)*4来代替则会这四个变量表示的是同一个[]对象
@@ -75,6 +75,8 @@ def build_data_matrix(_path):
                 querys.append(sign[1])
                 answers.append(sign[2])
                 candidates.append(sign[3])
+                # print(sign[0])
+                # break
     # print(len(querys))
     # print(querys[0])
     # build_word_to_indice_map(documents)
@@ -84,6 +86,7 @@ def build_data_matrix(_path):
 def build_word_to_indice_map(_documents):
     '''
     建立词到索引的map,第0号索引留给填充位，1号索引留给未在该map中出现的词
+    此处建立的词汇表与论文里的统计数据不一致
     :param _documents:
     :return:
     '''
@@ -96,16 +99,24 @@ def build_word_to_indice_map(_documents):
             if not wordToIndice.has_key(word):
                 wordToIndice[word] = i
                 i += 1
-
+    print('vocabulary size is ')
+    print(len(set(wordToIndice.keys())))
     return wordToIndice
 
+
 def max_word_in_list(_datas):
+    '''
+    _datas的元素为列表则返回列表的最大长度，如果是空格隔开的字符串则返回最大词数
+    :param _datas:
+    :return:
+    '''
     maxLength = 0
     for data in _datas:
-        if(len(data)>1):
+        if( isinstance(data, list) == True ):
             length = len(data)
         else:
             length = len(data.split())
+
         if length>maxLength:
             maxLength = length
 
@@ -121,16 +132,16 @@ def build_indice_matrix(_datas, _wordToIndice, _maxLength):
     :return:
     '''
     sampleNums = len(_datas)
-    sign = len(_datas[0])
+    sign = isinstance(_datas[0], list)
     dataMatrix = []
     sequenceLength = []
-    if sign==1:
+    if not sign:
         for i in xrange(sampleNums):
-            length = len(_datas[i])
+            words = _datas[i].split()
+            length = len(words)
             sequenceLength.append(length)
             gap = _maxLength - length
 
-            words = _datas[i].split()
             oneRow = []
             for word in words:
                 if(_wordToIndice.has_key(word) ):
@@ -138,7 +149,7 @@ def build_indice_matrix(_datas, _wordToIndice, _maxLength):
                 else:
                     oneRow.append(1)
 
-            oneRow.extend([0]*gap)
+            oneRow.extend([0]*gap)   #若gap为负数，则[0]*gap为[]
             oneRow = oneRow[:_maxLength]
             dataMatrix.append(oneRow)
     else:
@@ -158,12 +169,34 @@ def build_indice_matrix(_datas, _wordToIndice, _maxLength):
             oneRow = oneRow[:_maxLength]
             dataMatrix.append(oneRow)
 
-    print(len(dataMatrix))
-    print(len(dataMatrix[0]))
-    print(_datas[0])
-    print(dataMatrix[0])
     return dataMatrix, sequenceLength
 
+
+def build_document_word_flag_list(_document, _word):
+    flags = [0]*len(_document)
+    for i in xrange(len(_document)):
+        if _document[i] == _word:
+            # flags.append(i)
+            flags[i] = 1
+    return flags
+
+
+def build_document_candidate_matrix(_documents, _candidates):
+    matrix = []
+    i= 0
+    for d, candidate in zip(_documents, _candidates):
+        i += 1
+        if(i%100 == 0):
+            print(i)
+
+        dmatrix = []  #每行存放每个候选词在document中的指示
+        for c in candidate:
+            # print(c)
+            # if c!=0:
+                dmatrix.append(build_document_word_flag_list(d, c))
+        matrix.append(dmatrix)
+
+    return matrix
 
 def build_train_matrix():
     documents, querys, answers, candidates = build_data_matrix('data/cbtest_NE_train.txt')
@@ -178,6 +211,11 @@ def build_train_matrix():
 
 
 def extract_one_sample(_f):
+    '''
+    返回的document, query,answer都是由空格隔开的字符串， candidate返回的是一个字符串列表
+    :param _f:
+    :return:
+    '''
     data = ""
     for i in xrange(20):
         line = _f.readline()
