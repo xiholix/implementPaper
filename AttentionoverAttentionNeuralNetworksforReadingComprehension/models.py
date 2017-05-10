@@ -38,7 +38,8 @@ from __future__ import absolute_import
 import tensorflow as tf
 
 from reader import  *
-
+from inputTfRecord import *
+from util import *
 flags = tf.flags
 flags.DEFINE_integer("dimension", 384, "dimension of embedding")
 flags.DEFINE_integer("units", 256, "the units of Hidden layer")
@@ -48,6 +49,7 @@ flags.DEFINE_integer('batchSize', 5, "the batch size")
 flags.DEFINE_integer("maxDocumentLength", 1319, "the largest number of word in document")
 flags.DEFINE_integer("maxQueryLength", 210, "the largest number of word in query")
 flags.DEFINE_integer("maxCandidate", 11, "the largest number of candidates ")
+flags.DEFINE_integer("vocabSize", 67802, "vocabulary size")
 FLAGS = flags.FLAGS
 
 
@@ -200,9 +202,103 @@ class AOAModel(object):
         result = tf.matmul(columnWiseSoftmax, columWeightT)
 
 
+class AOAModelNew():
+    def __init__(self, _isTraining):
+        document, query, answer, documentLength, queryLength = reader_tfrecorder()
+        self.keepProb = 1 - FLAGS.dropRate
+        self.embeddings = tf.Variable(tf.random_uniform([FLAGS.vocabSize, FLAGS.dimension], -0.05, 0.05))
 
+        documentEmbedding = tf.nn.embedding_lookup(self.embeddings, document)
+        queryEmbedding = tf.nn.embedding_lookup(self.embeddings, query)
+
+        def gru_cell():
+            return tf.contrib.rnn.core_rnn_cell.GRUCell(FLAGS.units)
+
+        attn_cell = gru_cell
+
+        if _isTraining and self.keepProb < 1:
+            def attn_cell():
+                return tf.contrib.rnn.DropoutWrapper(gru_cell(), output_keep_prob=self.keepProb)
+
+        self.gruCellForward = attn_cell()
+        self.gruCellBackward = attn_cell()
+        # self.initialStateForward = self.gruCellForward.zero_state(FLAGS.batchSize, tf.float32)
+        # self.initialStateBackward = self.gruCellBackward.zero_state(FLAGS.batchSize, tf.float32)
+        documentEmbedding.set_shape([None, None, FLAGS.dimension])
+
+        (outputsForDocument, outputsStateForDocument) = tf.nn.bidirectional_dynamic_rnn(self.gruCellForward,
+                                                                                        self.gruCellBackward,
+                                                                                        inputs=documentEmbedding,
+                                                                                        sequence_length=tf.to_int64(documentLength),
+                                                                                        # initial_state_fw=self.initialStateForward,
+                                                                                        # initial_state_bw=self.initialStateBackward
+                                                                                        dtype=tf.float32,
+                                                                                        time_major=False,
+                                                                                        scope='queryrnn'
+                                                                                        )
+        # 当网络中用到了多个bidirectional_dynamic_rnn时，必须设置它的scope，否则都用同一个默认scope则它们会使用相同的一个子图
+
+        hiddenDocument = tf.concat(outputsForDocument, 2)
+
+        # test_variable(hiddenDocument)
+
+        self.gruCellForwardForQuery = attn_cell()
+        self.gruCellBackwardForQuery = attn_cell()
+        self.initialStateForwardForQuery = self.gruCellForwardForQuery.zero_state(FLAGS.batchSize, tf.float32)
+        self.initialStateBackwardForQuery = self.gruCellBackwardForQuery.zero_state(FLAGS.batchSize, tf.float32)
+
+        (outputForQuery, outputsStateForQuery) = tf.nn.bidirectional_dynamic_rnn(self.gruCellForwardForQuery,
+                                                                    self.gruCellBackwardForQuery,
+                                                                    inputs=queryEmbedding,
+                                                                    sequence_length=queryLength,
+                                                                    initial_state_fw=self.initialStateForwardForQuery,
+                                                                    initial_state_bw=self.initialStateBackwardForQuery)
+        hiddenQuery = tf.concat(outputForQuery, 2)  # 可能出现问题
+
+
+        hiddenQueryT = tf.matrix_transpose(hiddenQuery)
+        scoreMatrix = tf.matmul(hiddenDocument, hiddenQueryT)  # shape为 batch×document*query
+        test_variable(scoreMatrix)
+
+        maskMatrix = get_mask_matrix(documentLength, queryLength, scoreMatrix.get_shape())
+
+        columnWiseSoftmax = softmax(scoreMatrix, 2, maskMatrix)
+        rowWiseSoftmax = softmax(scoreMatrix, 1, maskMatrix)
+        test_variable(columnWiseSoftmax)
+        #
+        # columnWiseSoftmax = tf.nn.softmax(scoreMatrix)
+        #
+        # rowWiseSoftmax = tf.nn.softmax(scoreMatrix, dim=1)
+        # columWeight = tf.reduce_mean(rowWiseSoftmax, axis=1, keep_dims=True)
+        #
+        # columWeightT = tf.matrix_transpose(columWeight)
+        # result = tf.matmul(columnWiseSoftmax, columWeightT)
+
+def test_use_reader_tfrecorder():
+    batchData = reader_tfrecorder()
+
+    init = tf.global_variables_initializer()
+    sess = tf.Session()
+    sess.run(init)
+    tf.train.start_queue_runners(sess=sess)
+
+    batch = sess.run(batchData)
+    print(batch)
+
+
+def test_variable(_variable):
+    init = tf.global_variables_initializer()
+    sess = tf.Session()
+    sess.run(init)
+    tf.train.start_queue_runners(sess=sess)
+
+    v = sess.run(_variable)
+    print(v)
+    print(v.shape)
 
 if __name__ == "__main__":
     # test()
     # print (FLAGS.dimension)
-    input = AOAInputByIndice('data/cbtest_NE_train.txt')
+    # input = AOAInputByIndice('data/cbtest_NE_train.txt')
+    # test_use_reader_tfrecorder()
+    t = AOAModelNew(True)

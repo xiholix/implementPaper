@@ -36,7 +36,7 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 import tensorflow as tf
-
+import numpy as np
 
 def softmax(_datas, _axis, _mask):
 
@@ -49,6 +49,15 @@ def softmax(_datas, _axis, _mask):
     softmaxValue = maskDatas / sumDatas
 
     return softmaxValue
+
+
+def get_mask_matrix(_row_lengths, _column_lengths, _shape):
+    zeros = np.zeros(_shape)
+    for i in xrange(_shape[0]):
+        zeros[i, :_row_lengths[i], :_column_lengths[i]] = 1
+
+    print(zeros)
+    return zeros
 
 
 def test_softmax():
@@ -79,5 +88,10 @@ def test_softmax():
     print(d2)
 
 
+def test():
+    get_mask_matrix([2,3,3,2], [2,3,4,2], (4,4,5))
+
+
 if __name__ == "__main__":
-    test_softmax()
+    # test_softmax()
+    test()
