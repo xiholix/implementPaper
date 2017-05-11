@@ -204,13 +204,14 @@ class AOAModel(object):
 
 class AOAModelNew():
     def __init__(self, _isTraining):
-        document, query, answer, documentLength, queryLength = reader_tfrecorder()
+        document, query, answer, documentLength, queryLength, documentMask, queryMask = reader_tfrecorder()
         self.keepProb = 1 - FLAGS.dropRate
         self.embeddings = tf.Variable(tf.random_uniform([FLAGS.vocabSize, FLAGS.dimension], -0.05, 0.05))
 
         documentEmbedding = tf.nn.embedding_lookup(self.embeddings, document)
         queryEmbedding = tf.nn.embedding_lookup(self.embeddings, query)
-
+        documentMask = tf.to_float( tf.expand_dims(documentMask, -1) )
+        queryMask = tf.to_float( tf.expand_dims(queryMask, 1) )
         def gru_cell():
             return tf.contrib.rnn.core_rnn_cell.GRUCell(FLAGS.units)
 
@@ -258,21 +259,44 @@ class AOAModelNew():
 
         hiddenQueryT = tf.matrix_transpose(hiddenQuery)
         scoreMatrix = tf.matmul(hiddenDocument, hiddenQueryT)  # shape为 batch×document*query
-        test_variable(scoreMatrix)
+        # test_variable(scoreMatrix)
 
-        maskMatrix = get_mask_matrix(documentLength, queryLength, scoreMatrix.get_shape())
-
+        # maskMatrix = get_mask_matrix(documentLength, queryLength, scoreMatrix.get_shape())
+        maskMatrix =tf.to_float( tf.matmul(documentMask, queryMask) )
         columnWiseSoftmax = softmax(scoreMatrix, 2, maskMatrix)
         rowWiseSoftmax = softmax(scoreMatrix, 1, maskMatrix)
-        test_variable(columnWiseSoftmax)
+        # test_variable(columnWiseSoftmax)
         #
         # columnWiseSoftmax = tf.nn.softmax(scoreMatrix)
         #
         # rowWiseSoftmax = tf.nn.softmax(scoreMatrix, dim=1)
-        # columWeight = tf.reduce_mean(rowWiseSoftmax, axis=1, keep_dims=True)
+        columWeight = tf.reduce_mean(rowWiseSoftmax, axis=1, keep_dims=True)
+        # test_variable(columWeight)
+        # test_variable(columnWiseSoftmax)
         #
-        # columWeightT = tf.matrix_transpose(columWeight)
-        # result = tf.matmul(columnWiseSoftmax, columWeightT)
+        columWeightT = tf.matrix_transpose(columWeight)
+        result = tf.matmul(columnWiseSoftmax, columWeightT)
+        # test_variable(result)
+        result = tf.squeeze(result, -1)
+        test_variable(result)
+        # answerProb = tf.segment_sum(result, document)
+        unpackAnswer = zip(tf.unstack(result, FLAGS.batchSize), tf.unstack(document, FLAGS.batchSize))
+        answerProb = tf.stack([tf.unsorted_segment_sum(d, s, FLAGS.vocabSize) for (d,s) in unpackAnswer])
+        d = tf.argmax(answerProb, 1)
+        test_variable(d)
+
+        index = tf.range(FLAGS.batchSize)*FLAGS.vocabSize + tf.to_int32(answer)
+        flat = tf.reshape(answerProb, [-1])
+        relevant = tf.gather(flat, index)
+        loss = -tf.reduce_mean(tf.log(relevant))
+
+        optimizer = tf.train.AdadeltaOptimizer()
+        for i in xrange(10000):
+            optimizer.minimize(loss)
+
+            accuracy = tf.reduce_mean(tf.cast( tf.equal(tf.argmax(answerProb, 1), answer), tf.float32))
+            test_variable(accuracy)
+
 
 def test_use_reader_tfrecorder():
     batchData = reader_tfrecorder()
@@ -286,6 +310,7 @@ def test_use_reader_tfrecorder():
     print(batch)
 
 
+
 def test_variable(_variable):
     init = tf.global_variables_initializer()
     sess = tf.Session()
@@ -295,6 +320,7 @@ def test_variable(_variable):
     v = sess.run(_variable)
     print(v)
     print(v.shape)
+    # print(v.sum(axis=1))
 
 if __name__ == "__main__":
     # test()

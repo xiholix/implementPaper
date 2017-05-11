@@ -42,16 +42,29 @@ import numpy as np
 from reader import *
 # from models import FLAGS
 
+def produce_mask_by_length(_length, _size):
+    data = []
+    for i in xrange(len(_length)):
+        d = [0] * _size
+        d[:_length[i]] = [1]*_length[i]
+        data.append(d)
+    # print(data)
+    # print(data[0])
+    # print(len(data))
+    # print(len(data[0]))
+    return data
 
 def writeTfRecorder(_path):
-
+    import pickle
     writer = tf.python_io.TFRecordWriter(_path)
     datas = build_data_matrix('data/cbtest_NE_train.txt')
     wordIndiceMap = build_word_to_indice_map(datas[0])
+    pickle.dump(wordIndiceMap, open("word.dic", "wb"))
     documents, documentLength = build_indice_matrix(datas[0], wordIndiceMap, 1319)
     querys, queryLength = build_indice_matrix(datas[1], wordIndiceMap, 210)
     answers, answerLength = build_indice_matrix(datas[2], wordIndiceMap, 1)
-
+    documentMask = produce_mask_by_length(documentLength, 1319)
+    queryMask = produce_mask_by_length(queryLength, 210)
     print( len(answers))
     for i in xrange(len(querys)):
         documentsFeature = tf.train.Feature(int64_list=tf.train.Int64List(value=documents[i]))
@@ -59,13 +72,16 @@ def writeTfRecorder(_path):
         answersFeature = tf.train.Feature(int64_list=tf.train.Int64List(value=answers[i]))
         documentLengthFeature = tf.train.Feature(int64_list=tf.train.Int64List(value=[documentLength[i]]))
         queryLengthFeature = tf.train.Feature(int64_list=tf.train.Int64List(value=[queryLength[i]]))
-
+        documentMaskFeature = tf.train.Feature(int64_list=tf.train.Int64List(value=documentMask[i]))
+        queryMaskFeature = tf.train.Feature(int64_list=tf.train.Int64List(value=queryMask[i]))
         features = tf.train.Features(feature={
             'document':documentsFeature,
             'query':querysFeature,
             'answer':answersFeature,
             'documentLength':documentLengthFeature,
-            'queryLength':queryLengthFeature
+            'queryLength':queryLengthFeature,
+            'documentMask':documentMaskFeature,
+            'queryMask':queryMaskFeature
         })
 
         example = tf.train.Example(features=features)
@@ -84,11 +100,14 @@ def reader_tfrecorder():
         'query':tf.FixedLenFeature([210], tf.int64),
         'answer':tf.FixedLenFeature([], tf.int64),
         'documentLength':tf.FixedLenFeature([], tf.int64),
-        'queryLength':tf.FixedLenFeature([], tf.int64)
+        'queryLength':tf.FixedLenFeature([], tf.int64),
+        'queryMask':tf.FixedLenFeature([210], tf.int64),
+        'documentMask':tf.FixedLenFeature([1319], tf.int64)
     })
 
     batchData = tf.train.shuffle_batch([examples['document'], examples['query'], examples['answer'],
-                                        examples['documentLength'], examples['queryLength']], 5, 25, 5)
+                                        examples['documentLength'], examples['queryLength'],
+                                        examples['documentMask'], examples['queryMask']], 5, 25, 5)
     # shuffle_batch的结果的batch内容存在第一维中，第0维的长度是第一个参数列表的长度
 
 
@@ -96,6 +115,7 @@ def reader_tfrecorder():
     # sess = tf.Session()
     # sess.run(init)
     # tf.train.start_queue_runners(sess=sess)
+    # print(sess.run(batchData[5]))
     #
     # example = sess.run(examples)
     # print((example['answer']))

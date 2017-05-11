@@ -38,7 +38,7 @@ from __future__ import absolute_import
 import tensorflow as tf
 import numpy as np
 
-def softmax(_datas, _axis, _mask):
+def softmax(_datas, _axis, _mask,  epsilon=1e-12):
 
     maxAxis = tf.reduce_max(_datas, axis=_axis, keep_dims=True)
     _datas = _datas - maxAxis
@@ -46,7 +46,8 @@ def softmax(_datas, _axis, _mask):
     sumDatas = tf.reduce_sum(maskDatas, axis=_axis, keep_dims=True)
     # 此处应该不要为结果加一个小数，防止除以0,感觉被掩盖的数的原始值不太可能远大于没被掩盖的数
     # 所以此处应该不会有0
-    softmaxValue = maskDatas / sumDatas
+    # GRU在计算时会对于不在序列长度的部分返回0,所以会有些行和列全为0
+    softmaxValue = maskDatas / (sumDatas+epsilon)
 
     return softmaxValue
 
@@ -92,6 +93,16 @@ def test():
     get_mask_matrix([2,3,3,2], [2,3,4,2], (4,4,5))
 
 
+def test_word():
+    import pickle
+    wordDic = pickle.load(open("word.dic"))
+    indiceToWord = {}
+    for key, value in wordDic.items():
+        indiceToWord[value] = key
+
+    print(indiceToWord[33])
+
 if __name__ == "__main__":
     # test_softmax()
-    test()
+    # test()
+    test_word()

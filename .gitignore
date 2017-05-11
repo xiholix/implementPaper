@@ -67,3 +67,5 @@ rexx/spider.py
 *log/
 */mydir/*
 *.tfrecord
+*.tf
+*.dic
