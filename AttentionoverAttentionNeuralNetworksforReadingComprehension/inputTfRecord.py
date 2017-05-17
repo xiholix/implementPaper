@@ -40,6 +40,7 @@ import tensorflow as tf
 import numpy as np
 
 from reader import *
+from config import FLAGS
 # from models import FLAGS
 
 def produce_mask_by_length(_length, _size):
@@ -107,7 +108,7 @@ def reader_tfrecorder():
 
     batchData = tf.train.shuffle_batch([examples['document'], examples['query'], examples['answer'],
                                         examples['documentLength'], examples['queryLength'],
-                                        examples['documentMask'], examples['queryMask']], 5, 25, 5)
+                                        examples['documentMask'], examples['queryMask']], FLAGS.batchSize, 5*FLAGS.batchSize, FLAGS.batchSize)
     # shuffle_batch的结果的batch内容存在第一维中，第0维的长度是第一个参数列表的长度
 
 
@@ -125,5 +126,6 @@ def reader_tfrecorder():
     return batchData
 
 if __name__ == "__main__":
-    writeTfRecorder("tfRecord/train.tfrecord")
-    # reader_tfrecorder()
+    # writeTfRecorder("tfRecord/train.tfrecord")
+    reader_tfrecorder()
+    # print(FLAGS.vocabSize)

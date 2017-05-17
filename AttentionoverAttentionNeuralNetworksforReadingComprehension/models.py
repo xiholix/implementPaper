@@ -36,21 +36,12 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 import tensorflow as tf
+import time
 
 from reader import  *
 from inputTfRecord import *
 from util import *
-flags = tf.flags
-flags.DEFINE_integer("dimension", 384, "dimension of embedding")
-flags.DEFINE_integer("units", 256, "the units of Hidden layer")
-flags.DEFINE_float("l2", 0.0001, "the le regularization")
-flags.DEFINE_float("dropRate", 0.1, "the drop rate")
-flags.DEFINE_integer('batchSize', 5, "the batch size")
-flags.DEFINE_integer("maxDocumentLength", 1319, "the largest number of word in document")
-flags.DEFINE_integer("maxQueryLength", 210, "the largest number of word in query")
-flags.DEFINE_integer("maxCandidate", 11, "the largest number of candidates ")
-flags.DEFINE_integer("vocabSize", 67802, "vocabulary size")
-FLAGS = flags.FLAGS
+from config import FLAGS
 
 
 
@@ -205,6 +196,7 @@ class AOAModel(object):
 class AOAModelNew():
     def __init__(self, _isTraining):
         document, query, answer, documentLength, queryLength, documentMask, queryMask = reader_tfrecorder()
+        print('do')
         self.keepProb = 1 - FLAGS.dropRate
         self.embeddings = tf.Variable(tf.random_uniform([FLAGS.vocabSize, FLAGS.dimension], -0.05, 0.05))
 
@@ -278,12 +270,12 @@ class AOAModelNew():
         result = tf.matmul(columnWiseSoftmax, columWeightT)
         # test_variable(result)
         result = tf.squeeze(result, -1)
-        test_variable(result)
+        # test_variable(result)
         # answerProb = tf.segment_sum(result, document)
         unpackAnswer = zip(tf.unstack(result, FLAGS.batchSize), tf.unstack(document, FLAGS.batchSize))
         answerProb = tf.stack([tf.unsorted_segment_sum(d, s, FLAGS.vocabSize) for (d,s) in unpackAnswer])
         d = tf.argmax(answerProb, 1)
-        test_variable(d)
+        # test_variable(d)
 
         index = tf.range(FLAGS.batchSize)*FLAGS.vocabSize + tf.to_int32(answer)
         flat = tf.reshape(answerProb, [-1])
@@ -291,11 +283,15 @@ class AOAModelNew():
         loss = -tf.reduce_mean(tf.log(relevant))
 
         optimizer = tf.train.AdadeltaOptimizer()
-        for i in xrange(10000):
-            optimizer.minimize(loss)
+        train = optimizer.minimize(loss)
+        accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(answerProb, 1), answer), tf.float32))
+        # test_variable(d, train)
+        # for i in xrange(10000):
+        #     test_variable(accuracy, train)
+        self.train = train
+        self.loss = loss
+        self.acc = accuracy
 
-            accuracy = tf.reduce_mean(tf.cast( tf.equal(tf.argmax(answerProb, 1), answer), tf.float32))
-            test_variable(accuracy)
 
 
 def test_use_reader_tfrecorder():
@@ -311,20 +307,59 @@ def test_use_reader_tfrecorder():
 
 
 
-def test_variable(_variable):
+def test_variable(_variable, train=None):
     init = tf.global_variables_initializer()
+
     sess = tf.Session()
     sess.run(init)
+    # tf.train.start_queue_runners(sess=sess)
     tf.train.start_queue_runners(sess=sess)
 
     v = sess.run(_variable)
     print(v)
     print(v.shape)
+
+    if train:
+        for i in xrange(1000):
+            # sess.run(train)
+            v = sess.run(_variable)
+            print(v)
+
     # print(v.sum(axis=1))
+
+
+def run_epoch(_session, _model, _evalOp=None):
+    startTime = time.time()
+
+    count = 0
+    epochSize = FLAGS.trainSampleSize//FLAGS.batchSize
+    totalLoss = 0.0
+    for i in xrange(10000):
+        _session.run(_model.train)
+        loss = _session.run(_model.acc)
+        totalLoss += loss
+        print(loss)
+        print(time.time()-startTime)
+        startTime = time.time()
+
+
+def run_test():
+    t = AOAModelNew(True)
+    init = tf.global_variables_initializer()
+
+    sess = tf.Session()
+    sess.run(init)
+    # tf.train.start_queue_runners(sess=sess)
+    tf.train.start_queue_runners(sess=sess)
+
+    run_epoch(sess, t)
 
 if __name__ == "__main__":
     # test()
     # print (FLAGS.dimension)
     # input = AOAInputByIndice('data/cbtest_NE_train.txt')
     # test_use_reader_tfrecorder()
-    t = AOAModelNew(True)
+    print('heloo')
+    # t = AOAModelNew(True)
+    # run_epoch(1,2,3)
+    run_test()

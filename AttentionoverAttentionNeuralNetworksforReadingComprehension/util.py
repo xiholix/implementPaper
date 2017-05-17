@@ -100,7 +100,7 @@ def test_word():
     for key, value in wordDic.items():
         indiceToWord[value] = key
 
-    print(indiceToWord[33])
+    print(indiceToWord[13])
 
 if __name__ == "__main__":
     # test_softmax()
